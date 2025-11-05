@@ -30,8 +30,14 @@ if [[ ! -f ./wg-obfuscator ]]; then
 fi
 
 mkdir -p "$INSTALL_DIR"
+if [[ -f /usr/local/bin/wg-obfuscator ]]; then
+  rm /usr/local/bin/wg-obfuscator
+fi
 cp ./wg-obfuscator /usr/local/bin/wg-obfuscator
 chmod +x /usr/local/bin/wg-obfuscator
+if [[ -f "$INSTALL_DIR/wg-obfuscator" ]]; then
+  rm "$INSTALL_DIR/wg-obfuscator"
+fi
 cp ./wg-obfuscator "$INSTALL_DIR/wg-obfuscator"
 chmod +x "$INSTALL_DIR/wg-obfuscator"
 
