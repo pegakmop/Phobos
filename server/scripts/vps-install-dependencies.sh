@@ -30,7 +30,8 @@ apt-get install -y \
   wireguard \
   wireguard-tools \
   iptables \
-  ufw
+  ufw \
+  cron
 
 echo ""
 echo "=========================================="
@@ -46,4 +47,5 @@ echo "  - python3 (HTTP сервер)"
 echo "  - openssl (генерация ключей)"
 echo "  - wireguard, wireguard-tools (VPN)"
 echo "  - iptables, ufw (firewall)"
+echo "  - cron (планировщик задач)"
 echo ""
