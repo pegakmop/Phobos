@@ -153,7 +153,22 @@ fi
 
 echo "==> Создание README..."
 
-source "$PHOBOS_DIR/server/server.env"
+if [[ ! -f "$PHOBOS_DIR/server/server.env" ]]; then
+  echo "Ошибка: файл $PHOBOS_DIR/server/server.env не найден"
+  echo "Сначала запустите vps-init-all.sh для инициализации сервера"
+  exit 1
+fi
+
+set +e
+source "$PHOBOS_DIR/server/server.env" 2>/dev/null
+SOURCE_RESULT=$?
+set -e
+
+if [[ $SOURCE_RESULT -ne 0 ]]; then
+  echo "Ошибка: файл server.env содержит некорректные данные"
+  echo "Повторно запустите vps-init-all.sh для пересоздания конфигурации"
+  exit 1
+fi
 
 cat > "$PACKAGE_DIR/README.txt" <<EOF
 ====================================================

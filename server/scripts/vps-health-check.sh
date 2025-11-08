@@ -110,42 +110,6 @@ check_obfuscator_process() {
   fi
 }
 
-check_firewall() {
-  if ! command -v ufw &>/dev/null; then
-    print_status "WARN" "UFW не установлен"
-    return 1
-  fi
-
-  if ufw status | grep -q "Status: active"; then
-    print_status "OK" "UFW активирован"
-
-    if [[ -f "${SERVER_ENV}" ]]; then
-      source "${SERVER_ENV}"
-
-      if [[ -n "${OBFUSCATOR_PORT:-}" ]]; then
-        if ufw status | grep -q "${OBFUSCATOR_PORT}/udp"; then
-          print_status "OK" "Порт obfuscator ${OBFUSCATOR_PORT}/udp открыт"
-        else
-          print_status "FAIL" "Порт obfuscator ${OBFUSCATOR_PORT}/udp не открыт"
-        fi
-      fi
-
-      if [[ -n "${HTTP_PORT:-}" ]]; then
-        if ufw status | grep -q "${HTTP_PORT}/tcp"; then
-          print_status "OK" "Порт HTTP ${HTTP_PORT}/tcp открыт"
-        else
-          print_status "WARN" "Порт HTTP ${HTTP_PORT}/tcp не открыт"
-        fi
-      fi
-    fi
-
-    return 0
-  else
-    print_status "WARN" "UFW не активирован"
-    return 1
-  fi
-}
-
 echo "=========================================="
 echo "  Phobos VPS Health Check"
 echo "=========================================="
@@ -176,10 +140,6 @@ check_wireguard_interface
 echo ""
 echo "==> Проверка процессов"
 check_obfuscator_process
-
-echo ""
-echo "==> Проверка firewall"
-check_firewall
 
 echo ""
 echo "==> Проверка дискового пространства"

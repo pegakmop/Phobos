@@ -91,21 +91,6 @@ else
   exit 1
 fi
 
-echo "==> Настройка firewall (ufw)"
-if command -v ufw &> /dev/null; then
-  if ufw status | grep -q "Status: active"; then
-    echo "Открытие порта 22/tcp (SSH) в firewall"
-    ufw allow 22/tcp
-    echo "Открытие порта ${HTTP_PORT}/tcp в firewall"
-    ufw allow ${HTTP_PORT}/tcp
-    ufw reload
-  else
-    echo "UFW не активирован, пропуск настройки firewall"
-  fi
-else
-  echo "UFW не установлен, пропуск настройки firewall"
-fi
-
 echo "==> Сохранение параметров HTTP сервера в ${SERVER_ENV}"
 if [[ -f "${SERVER_ENV}" ]]; then
   if grep -q "^HTTP_PORT=" "${SERVER_ENV}"; then

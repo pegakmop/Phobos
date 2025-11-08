@@ -440,16 +440,6 @@ max-dummy = $final_dummy
 EOF
 
   echo ""
-  echo "==> Обновление firewall..."
-  if command -v ufw >/dev/null 2>&1; then
-    if [[ -n "$NEW_PORT" ]]; then
-      ufw delete allow "$CURRENT_PORT/udp" 2>/dev/null || true
-      ufw allow "$final_port/udp" || true
-      echo "Firewall обновлен: порт $final_port/udp открыт"
-    fi
-  fi
-
-  echo ""
   echo "==> Перезапуск службы wg-obfuscator..."
   systemctl restart wg-obfuscator
 
@@ -647,19 +637,6 @@ check_health() {
   else
     echo "  ✗ Порт $CURRENT_PORT не прослушивается"
     status_ok=false
-  fi
-
-  echo ""
-  echo "==> Проверка firewall..."
-  if command -v ufw >/dev/null 2>&1; then
-    if ufw status | grep -q "$CURRENT_PORT/udp"; then
-      echo "  ✓ Порт $CURRENT_PORT/udp открыт в firewall"
-    else
-      echo "  ✗ Порт $CURRENT_PORT/udp не открыт в firewall"
-      status_ok=false
-    fi
-  else
-    echo "  - UFW не установлен"
   fi
 
   echo ""

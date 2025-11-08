@@ -23,6 +23,9 @@ apt install -y wireguard wireguard-tools
 if [[ -z "$SERVER_PUBLIC_IP" ]]; then
   echo "==> Определение публичного IPv4 адреса..."
   SERVER_PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s icanhazip.com || curl -4 -s ipecho.net/plain)
+  if [[ ! "$SERVER_PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    SERVER_PUBLIC_IP=""
+  fi
   if [[ -z "$SERVER_PUBLIC_IP" ]]; then
     echo "Не удалось автоматически определить публичный IPv4. Укажите вручную:"
     read -p "Введите публичный IPv4 адрес VPS: " SERVER_PUBLIC_IP
@@ -33,6 +36,9 @@ echo "Публичный IPv4 адрес: $SERVER_PUBLIC_IP"
 
 echo "==> Определение публичного IPv6 адреса (опционально)..."
 SERVER_PUBLIC_IP_V6=$(curl -6 -s --max-time 3 ifconfig.me 2>/dev/null || curl -6 -s --max-time 3 icanhazip.com 2>/dev/null || echo "")
+if [[ ! "$SERVER_PUBLIC_IP_V6" =~ ^[0-9a-fA-F:]+$ ]] || [[ "$SERVER_PUBLIC_IP_V6" =~ [^0-9a-fA-F:] ]] || [[ ! "$SERVER_PUBLIC_IP_V6" =~ : ]]; then
+  SERVER_PUBLIC_IP_V6=""
+fi
 if [[ -n "$SERVER_PUBLIC_IP_V6" ]]; then
   echo "Публичный IPv6 адрес: $SERVER_PUBLIC_IP_V6"
 else
@@ -87,16 +93,6 @@ sysctl -p /etc/sysctl.d/99-wireguard.conf
 echo "==> Запуск WireGuard..."
 systemctl enable wg-quick@wg0
 systemctl start wg-quick@wg0
-
-echo "==> Настройка firewall..."
-if command -v ufw >/dev/null 2>&1; then
-  ufw allow 22/tcp || true
-  echo "Порт 22/tcp (SSH) открыт в ufw"
-  ufw allow $WG_PORT/udp || true
-  echo "Порт $WG_PORT/udp открыт в ufw"
-else
-  echo "ufw не установлен. Убедитесь, что порты 22/tcp и $WG_PORT/udp открыты в firewall."
-fi
 
 echo "==> Сохранение IP адресов..."
 cat > "$PHOBOS_DIR/server/ip_addresses.env" <<EOF

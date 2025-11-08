@@ -79,10 +79,11 @@ clone_repository() {
     git remote add origin https://github.com/Ground-Zerro/Phobos.git >/dev/null 2>&1 || error_exit "Failed to add git remote"
     
     git config core.sparseCheckout true >/dev/null 2>&1 || error_exit "Failed to enable sparse checkout"
-    
+
     echo "server" > .git/info/sparse-checkout
     echo "client" >> .git/info/sparse-checkout
-    
+    echo "wg-obfuscator" >> .git/info/sparse-checkout
+
     git pull origin main >/dev/null 2>&1 || error_exit "Failed to pull repository with sparse checkout"
     
     rm -rf .git >/dev/null 2>&1 || error_exit "Failed to remove .git directory"
@@ -95,8 +96,11 @@ clone_repository() {
     if [ -d "client" ]; then
         find client -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
     fi
-    
-    log_message "Repository cloned successfully with only server and client directories"
+    if [ ! -d "wg-obfuscator/bin" ]; then
+        error_exit "wg-obfuscator/bin directory not found after cloning"
+    fi
+
+    log_message "Repository cloned successfully"
 }
 
 clone_repository

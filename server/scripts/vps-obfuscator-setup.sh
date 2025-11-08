@@ -23,14 +23,32 @@ mkdir -p "$PHOBOS_DIR/server"
 
 if [[ -f "$PHOBOS_DIR/server/ip_addresses.env" ]]; then
   echo "==> Загрузка IP адресов из ip_addresses.env..."
-  source "$PHOBOS_DIR/server/ip_addresses.env"
-  SERVER_PUBLIC_IP="${SERVER_PUBLIC_IP_V4}"
-  SERVER_PUBLIC_IP_V6="${SERVER_PUBLIC_IP_V6}"
+  set +e
+  source "$PHOBOS_DIR/server/ip_addresses.env" 2>/dev/null
+  SOURCE_RESULT=$?
+  set -e
+  if [[ $SOURCE_RESULT -eq 0 ]]; then
+    if [[ "$SERVER_PUBLIC_IP_V4" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      SERVER_PUBLIC_IP="${SERVER_PUBLIC_IP_V4}"
+    fi
+    if [[ "$SERVER_PUBLIC_IP_V6" =~ ^[0-9a-fA-F:]+$ ]] && [[ ! "$SERVER_PUBLIC_IP_V6" =~ [^0-9a-fA-F:] ]] && [[ "$SERVER_PUBLIC_IP_V6" =~ : ]]; then
+      SERVER_PUBLIC_IP_V6="${SERVER_PUBLIC_IP_V6}"
+    else
+      SERVER_PUBLIC_IP_V6=""
+    fi
+  else
+    echo "Предупреждение: файл ip_addresses.env содержит некорректные данные, игнорируем"
+    SERVER_PUBLIC_IP=""
+    SERVER_PUBLIC_IP_V6=""
+  fi
 fi
 
 if [[ -z "$SERVER_PUBLIC_IP" ]]; then
   echo "==> Определение публичного IPv4 адреса..."
   SERVER_PUBLIC_IP=$(curl -4 -s ifconfig.me || curl -4 -s icanhazip.com || curl -4 -s ipecho.net/plain)
+  if [[ ! "$SERVER_PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    SERVER_PUBLIC_IP=""
+  fi
   if [[ -z "$SERVER_PUBLIC_IP" ]]; then
     echo "Не удалось автоматически определить публичный IPv4. Укажите вручную:"
     read -p "Введите публичный IPv4 адрес VPS: " SERVER_PUBLIC_IP
@@ -40,6 +58,9 @@ fi
 if [[ -z "$SERVER_PUBLIC_IP_V6" ]]; then
   echo "==> Определение публичного IPv6 адреса (опционально)..."
   SERVER_PUBLIC_IP_V6=$(curl -6 -s --max-time 3 ifconfig.me 2>/dev/null || curl -6 -s --max-time 3 icanhazip.com 2>/dev/null || echo "")
+  if [[ ! "$SERVER_PUBLIC_IP_V6" =~ ^[0-9a-fA-F:]+$ ]] || [[ "$SERVER_PUBLIC_IP_V6" =~ [^0-9a-fA-F:] ]] || [[ ! "$SERVER_PUBLIC_IP_V6" =~ : ]]; then
+    SERVER_PUBLIC_IP_V6=""
+  fi
 fi
 
 echo "Публичный IPv4 адрес: $SERVER_PUBLIC_IP"
@@ -114,16 +135,6 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-
-echo "==> Настройка firewall..."
-if command -v ufw >/dev/null 2>&1; then
-  ufw allow 22/tcp || true
-  echo "Порт 22/tcp (SSH) открыт в ufw"
-  ufw allow $OBFUSCATOR_LISTEN_PORT/udp || true
-  echo "Порт $OBFUSCATOR_LISTEN_PORT/udp открыт в ufw"
-else
-  echo "ufw не установлен. Убедитесь, что порты 22/tcp и $OBFUSCATOR_LISTEN_PORT/udp открыты в firewall."
-fi
 
 echo "==> Запуск wg-obfuscator..."
 systemctl enable wg-obfuscator
