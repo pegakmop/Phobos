@@ -9,6 +9,7 @@
 - [Интерактивное меню управления](#интерактивное-меню-управления)
 - [Мониторинг](#мониторинг)
 - [Обслуживание](#обслуживание)
+- [Удаление](#удаление)
 - [Решение проблем](#решение-проблем)
 
 ## Введение
@@ -43,11 +44,27 @@ Phobos - это система автоматизации развертыван
 
 ### Быстрая установка (рекомендуется)
 
+Запустите автоматическую установку:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/Phobos/main/phobos-deploy.sh)" </dev/tty
+```
+
+Скрипт автоматически:
+- Установит необходимые зависимости
+- Клонирует репозиторий в /opt/Phobos/repo
+- Скопирует готовые бинарники wg-obfuscator
+- Настроит WireGuard и obfuscator
+- Создаст первого клиента
+- Запустит HTTP сервер для раздачи пакетов
+
+### Ручная установка
+
 Клонируйте репозиторий на VPS:
 
 ```bash
-git clone https://github.com/yourusername/Phobos.git
-cd Phobos
+git clone https://github.com/Ground-Zerro/Phobos.git /opt/Phobos/repo
+cd /opt/Phobos/repo
 ```
 
 Запустите полную установку:
@@ -91,13 +108,13 @@ phobos
 ### Создание нового клиента вручную
 
 ```bash
-sudo /root/server/scripts/vps-client-add.sh <client_name>
+sudo /opt/Phobos/repo/server/scripts/vps-client-add.sh <client_name>
 ```
 
 ### Удаление клиента вручную
 
 ```bash
-sudo /root/server/scripts/vps-client-remove.sh <client_name>
+sudo /opt/Phobos/repo/server/scripts/vps-client-remove.sh <client_name>
 ```
 
 ## Интерактивное меню управления
@@ -175,6 +192,35 @@ wget -O - http://100.100.100.101:8080/init/a1b2c3d4e5f6.sh | sh
 ВАЖНО: Токен действителен до 2025-11-03 12:00:00
 ```
 
+## Удаление
+
+### Полное удаление Phobos
+
+```bash
+sudo /opt/Phobos/repo/server/scripts/vps-uninstall.sh
+```
+
+Скрипт удалит:
+- Все systemd сервисы (wg-quick@wg0, wg-obfuscator, phobos-http)
+- Конфигурации WireGuard (/etc/wireguard/wg0.conf)
+- Cron задачи
+- Бинарные файлы (/usr/local/bin/wg-obfuscator, /usr/local/bin/phobos)
+- Все данные в /opt/Phobos/
+
+### Удаление с сохранением данных
+
+Для сохранения резервной копии клиентских данных:
+
+```bash
+sudo /opt/Phobos/repo/server/scripts/vps-uninstall.sh --keep-data
+```
+
+Резервная копия будет создана в `/root/phobos-backup-<timestamp>/` и включает:
+- Конфигурации всех клиентов
+- Установочные пакеты
+- Ключи сервера
+- Параметры сервера (server.env)
+
 ## Решение проблем
 
 ### WireGuard не запускается
@@ -196,15 +242,15 @@ sudo journalctl -u wg-obfuscator -n 50
 ### Клиенты не могут подключиться
 
 Проверьте:
-1. Firewall открыт для порта obfuscator
-2. Obfuscator запущен и слушает правильный порт
-3. WireGuard запущен
-4. Ключи клиента добавлены на сервер
+1. Obfuscator запущен и слушает правильный порт
+2. WireGuard запущен
+3. Ключи клиента добавлены на сервер
+4. Порт obfuscator доступен извне
 
 ```bash
-sudo ufw status | grep <OBFUSCATOR_PORT>
 sudo wg show
 sudo systemctl status wg-obfuscator
+sudo ss -ulnp | grep <OBFUSCATOR_PORT>
 ```
 
 ### HTTP сервер недоступен

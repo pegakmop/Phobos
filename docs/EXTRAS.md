@@ -19,7 +19,7 @@ Phobos/
 ├── server/
 │   ├── scripts/
 │   │   ├── vps-install-dependencies.sh      # Установка зависимостей
-│   │   ├── vps-build-obfuscator.sh          # Сборка wg-obfuscator
+│   │   ├── vps-build-obfuscator.sh          # Копирование готовых бинарников
 │   │   ├── vps-wg-setup.sh                  # Установка WireGuard
 │   │   ├── vps-obfuscator-setup.sh          # Установка obfuscator
 │   │   ├── vps-client-add.sh                # Добавление клиента
@@ -34,6 +34,7 @@ Phobos/
 │   │   ├── vps-health-check.sh              # Health check VPS
 │   │   ├── vps-monitor-clients.sh           # Мониторинг клиентов
 │   │   ├── vps-obfuscator-config.sh         # Настройка obfuscator
+│   │   ├── vps-uninstall.sh                 # Удаление Phobos с VPS
 │   │   ├── phobos-menu.sh                   # Интерактивное меню управления
 │   │   ├── vps-install-menu.sh              # Установка меню phobos
 │   │   └── common-functions.sh              # Библиотека функций
@@ -44,6 +45,12 @@ Phobos/
 │       ├── router-configure-wireguard.sh.template    # Автонастройка WireGuard через RCI
 │       ├── router-health-check.sh.template           # Health check роутера
 │       └── detect-router-arch.sh.template            # Определение архитектуры
+├── wg-obfuscator/
+│   └── bin/
+│       ├── wg-obfuscator_x86_64                      # Готовый бинарник для VPS (x86_64)
+│       ├── wg-obfuscator-mipsel                      # Готовый бинарник для MIPS Little Endian
+│       ├── wg-obfuscator-mips                        # Готовый бинарник для MIPS Big Endian
+│       └── wg-obfuscator-aarch64                     # Готовый бинарник для ARM64
 ├── docs/
 │   ├── README-server.md                     # Руководство администратора
 │   ├── README-client.md                     # Руководство пользователя
@@ -127,8 +134,8 @@ Phobos/
 
 **На VPS:**
 ```bash
-sudo ./server/scripts/vps-health-check.sh      # Полная проверка системы
-sudo ./server/scripts/vps-monitor-clients.sh   # Мониторинг клиентов
+sudo /opt/Phobos/repo/server/scripts/vps-health-check.sh      # Полная проверка системы
+sudo /opt/Phobos/repo/server/scripts/vps-monitor-clients.sh   # Мониторинг клиентов
 ```
 
 **На роутере Keenetic:**
