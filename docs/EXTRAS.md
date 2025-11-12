@@ -161,7 +161,7 @@ sudo tcpdump -i any udp and port <OBFUSCATOR_PORT>
 ```bash
 ps | grep wg-obfuscator
 netstat -ulnp | grep 13255
-ping 10.8.0.1
+ping 10.25.0.1
 /opt/etc/init.d/S49wg-obfuscator restart
 ```
 
