@@ -69,8 +69,8 @@ show_clients_list() {
   if [[ ! -d "$PHOBOS_DIR/clients" ]] || [[ -z "$(ls -A "$PHOBOS_DIR/clients" 2>/dev/null)" ]]; then
     echo "Нет созданных клиентов"
   else
-    printf "%-20s %-20s %-20s\n" "CLIENT ID" "IPv4" "IPv6"
-    echo "------------------------------------------------------------"
+    printf "%-20s %-20s %-24s %-20s\n" "CLIENT ID" "IPv4" "IPv6" "Date of creation"
+    echo "--------------------------------------------------------------------------------"
 
     for client_dir in "$PHOBOS_DIR/clients"/*; do
       if [[ -d "$client_dir" ]]; then
@@ -84,7 +84,13 @@ show_clients_list() {
           ipv6="N/A"
         fi
 
-        printf "%-20s %-20s %-20s\n" "$client_id" "$ipv4" "$ipv6"
+        if [[ -d "$client_dir" ]]; then
+          creation_date=$(stat -c %y "$client_dir" 2>/dev/null | cut -d' ' -f1 || date -r "$client_dir" +%Y-%m-%d 2>/dev/null || echo "N/A")
+        else
+          creation_date="N/A"
+        fi
+
+        printf "%-20s %-20s %-24s %-20s\n" "$client_id" "$ipv4" "$ipv6" "$creation_date"
       fi
     done
   fi
@@ -106,8 +112,8 @@ select_client() {
 
   echo "ДОСТУПНЫЕ КЛИЕНТЫ:" >&2
   echo "" >&2
-  printf "%-5s %-20s %-20s %-20s\n" "№" "CLIENT ID" "IPv4" "IPv6" >&2
-  echo "--------------------------------------------------------------------" >&2
+  printf "%-5s %-20s %-20s %-24s %-20s\n" "№" "CLIENT ID" "IPv4" "IPv6" "Date of creation" >&2
+  echo "--------------------------------------------------------------------------------------------" >&2
 
   for client_dir in "$PHOBOS_DIR/clients"/*; do
     if [[ -d "$client_dir" ]]; then
@@ -122,7 +128,13 @@ select_client() {
         ipv6="N/A"
       fi
 
-      printf "%-5s %-20s %-20s %-20s\n" "$index" "$client_id" "$ipv4" "$ipv6" >&2
+      if [[ -d "$client_dir" ]]; then
+        creation_date=$(stat -c %y "$client_dir" 2>/dev/null | cut -d' ' -f1 || date -r "$client_dir" +%Y-%m-%d 2>/dev/null || echo "N/A")
+      else
+        creation_date="N/A"
+      fi
+
+      printf "%-5s %-20s %-20s %-24s %-20s\n" "$index" "$client_id" "$ipv4" "$ipv6" "$creation_date" >&2
       ((index++))
     fi
   done

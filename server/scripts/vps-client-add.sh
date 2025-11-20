@@ -47,30 +47,48 @@ if [[ -d "$CLIENT_DIR" ]]; then
   exit 1
 fi
 
-mkdir -p "$CLIENT_DIR"
-
 if [[ -z "$CLIENT_IP" ]]; then
   echo "==> Автоматическое назначение IP адреса клиенту..."
 
-  LAST_IP=$(grep -oP 'AllowedIPs\s*=\s*10\.25\.\K\d+\.\d+' "$WG_CONFIG" 2>/dev/null | sort -t. -k1,1n -k2,2n | tail -1 || echo "0.1")
+  declare -A used_ips_map
 
-  THIRD_OCTET=$(echo "$LAST_IP" | cut -d. -f1)
-  FOURTH_OCTET=$(echo "$LAST_IP" | cut -d. -f2)
+  for existing_client_dir in "$PHOBOS_DIR/clients"/*; do
+    if [[ -d "$existing_client_dir" ]] && [[ -f "$existing_client_dir/metadata.json" ]]; then
+      existing_ipv4=$(jq -r '.tunnel_ip_v4 // empty' "$existing_client_dir/metadata.json" 2>/dev/null)
+      if [[ -n "$existing_ipv4" ]]; then
+        used_ips_map["$existing_ipv4"]=1
+      fi
+    fi
+  done
 
-  FOURTH_OCTET=$((FOURTH_OCTET + 1))
+  USED_FROM_WG=$(grep -oP 'AllowedIPs\s*=\s*10\.25\.\K\d+\.\d+/32' "$WG_CONFIG" 2>/dev/null | sed 's|/32||' || true)
+  while IFS= read -r ip; do
+    if [[ -n "$ip" ]]; then
+      used_ips_map["10.25.$ip"]=1
+    fi
+  done <<< "$USED_FROM_WG"
 
-  if [[ $FOURTH_OCTET -gt 254 ]]; then
-    FOURTH_OCTET=2
-    THIRD_OCTET=$((THIRD_OCTET + 1))
-  fi
+  found_free_ip=false
+  for third_octet in $(seq 0 255); do
+    for fourth_octet in $(seq 2 254); do
+      candidate_ip="10.25.$third_octet.$fourth_octet"
 
-  if [[ $THIRD_OCTET -gt 255 ]]; then
+      if [[ -z "${used_ips_map[$candidate_ip]:-}" ]]; then
+        CLIENT_IP="$candidate_ip"
+        found_free_ip=true
+        echo "Найден свободный IP: $CLIENT_IP"
+        break 2
+      fi
+    done
+  done
+
+  if [[ "$found_free_ip" == false ]]; then
     echo "Ошибка: закончились IP адреса в подсети 10.25.0.0/16"
     exit 1
   fi
-
-  CLIENT_IP="10.25.$THIRD_OCTET.$FOURTH_OCTET"
 fi
+
+mkdir -p "$CLIENT_DIR"
 
 CLIENT_IP_V4="$CLIENT_IP"
 

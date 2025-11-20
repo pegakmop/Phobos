@@ -16,10 +16,13 @@ if [[ $(id -u) -ne 0 ]]; then
 fi
 
 if ! command -v jq &> /dev/null; then
-  echo "Ошибка: утилита 'jq' не установлена"
-  echo "Установите jq командой: apt-get install -y jq"
-  echo "Или запустите: ${SCRIPT_DIR}/vps-install-dependencies.sh"
-  exit 1
+  echo "Утилита 'jq' не установлена. Устанавливаю..."
+  apt-get update && apt-get install -y jq
+  if ! command -v jq &> /dev/null; then
+    echo "Ошибка: не удалось установить jq"
+    exit 1
+  fi
+  echo "✓ jq успешно установлен"
 fi
 
 if [[ $# -lt 1 ]]; then
