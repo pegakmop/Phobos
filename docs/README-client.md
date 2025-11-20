@@ -19,7 +19,7 @@
 ### Что будет установлено
 
 **Для Keenetic:**
-- jq - утилита для парсинга JSON (автоматически через opkg)
+- curl, jq - утилиты для загрузки файлов и парсинга JSON (автоматически через opkg)
 - wg-obfuscator - программа для обфускации WireGuard трафика
 - Автозапуск obfuscator через init-скрипт
 - Конфигурационные файлы в /opt/etc/Phobos/
@@ -126,7 +126,7 @@ curl -sL http://<server_ip>:8080/init/<token>.sh | sh
 Выполните команду на роутере через SSH.
 
 **Для Keenetic скрипт автоматически:**
-1. Установит jq (если отсутствует)
+1. Установит недостающие зависимости (curl, jq) через opkg
 2. Загрузит установочный пакет
 3. Определит архитектуру роутера
 4. Установит правильный бинарник wg-obfuscator
@@ -136,15 +136,16 @@ curl -sL http://<server_ip>:8080/init/<token>.sh | sh
 8. Развернет скрипты health-check и uninstall
 
 **Для OpenWrt скрипт автоматически:**
-1. Установит WireGuard пакеты (kmod-wireguard, wireguard-tools, luci-app-wireguard)
-2. Загрузит установочный пакет
-3. Определит архитектуру роутера
-4. Установит правильный бинарник wg-obfuscator
-5. Настроит автозапуск obfuscator
-6. Настроит WireGuard через UCI
-7. Создаст интерфейс "phobos_wg" и firewall зону "phobos"
-8. Активирует подключение
-9. Развернет скрипты health-check и uninstall
+1. Установит недостающие зависимости (curl, jq) через opkg
+2. Установит WireGuard пакеты (kmod-wireguard, wireguard-tools, luci-app-wireguard)
+3. Загрузит установочный пакет
+4. Определит архитектуру роутера
+5. Установит правильный бинарник wg-obfuscator
+6. Настроит автозапуск obfuscator
+7. Настроит WireGuard через UCI
+8. Создаст интерфейс "phobos_wg" и firewall зону "phobos"
+9. Активирует подключение
+10. Развернет скрипты health-check и uninstall
 
 ### Метод 2: Ручная установка
 
