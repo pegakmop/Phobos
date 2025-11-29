@@ -1,7 +1,7 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h masking.h masking_stun.h
+HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h masking.h masking_stun.h threading.h
 
 RELEASE ?= 0
 
@@ -18,7 +18,7 @@ endif
 ifdef STATIC
   LDFLAGS += -static -static-libgcc
 endif
-OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
+OBJS = wg-obfuscator.o config.o masking.o masking_stun.o threading.o
 EXEDIR = .
 
 EXTRA_CFLAGS ?=
@@ -35,10 +35,13 @@ else
   ARCH := $(shell uname -m 2>/dev/null || echo unknown)
 endif
 
+LDFLAGS += -pthread
+
 ifeq ($(ARCH),mips)
   EXTRA_CFLAGS += -march=mips32r2 -mtune=24kc
   EXTRA_CFLAGS += -fno-strict-aliasing -fweb -frename-registers
   EXTRA_CFLAGS += -funroll-loops --param max-unroll-times=4
+  LDFLAGS += -latomic
   ifndef DEBUG
     EXTRA_CFLAGS += -ffunction-sections -fdata-sections
     LDFLAGS += -Wl,--gc-sections
@@ -49,6 +52,7 @@ ifeq ($(ARCH),mipsel)
   EXTRA_CFLAGS += -march=mips32r2 -mtune=24kc -EL
   EXTRA_CFLAGS += -fno-strict-aliasing -fweb -frename-registers
   EXTRA_CFLAGS += -funroll-loops --param max-unroll-times=4
+  LDFLAGS += -latomic
   ifndef DEBUG
     EXTRA_CFLAGS += -ffunction-sections -fdata-sections
     LDFLAGS += -Wl,--gc-sections
@@ -91,6 +95,7 @@ ifeq ($(ARCH),armv7)
   EXTRA_CFLAGS += -march=armv7-a -mtune=cortex-a9 -mfpu=neon
   EXTRA_CFLAGS += -fomit-frame-pointer -fweb
   EXTRA_CFLAGS += -funroll-loops --param max-unroll-times=8
+  LDFLAGS += -latomic
   ifndef DEBUG
     EXTRA_CFLAGS += -ffunction-sections -fdata-sections
     LDFLAGS += -Wl,--gc-sections

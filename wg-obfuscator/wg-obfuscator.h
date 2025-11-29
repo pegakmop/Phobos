@@ -106,4 +106,9 @@ extern char section_name[256];
 
 void print_version(void);
 
+client_entry_t* find_client_safe(struct sockaddr_in *addr);
+void add_client_safe(client_entry_t *entry);
+void delete_client_safe(client_entry_t *entry);
+client_entry_t* new_client_entry(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr);
+
 #endif

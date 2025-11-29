@@ -7,11 +7,13 @@
 #include <signal.h>
 #include <time.h>
 #include <stdarg.h>
+#include <pthread.h>
 #include "wg-obfuscator.h"
 #include "config.h"
 #include "obfuscation.h"
 #include "uthash.h"
 #include "masking.h"
+#include "threading.h"
 
 // Verbosity level
 int verbose = LL_DEFAULT;
@@ -20,11 +22,66 @@ char section_name[256] = DEFAULT_INSTANCE_NAME;
 // Listening socket for receiving data from the clients
 static int listen_sock = 0;
 // Hash table for client connections
-static client_entry_t *conn_table = NULL;
+client_entry_t *conn_table = NULL;
+
+// Threading context
+static threading_context_t threading_ctx = {0};
+static pthread_rwlock_t conn_table_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+static pthread_mutex_t conn_table_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef USE_EPOLL
     static int epfd = 0;
 #endif
+
+client_entry_t* find_client_safe(struct sockaddr_in *addr) {
+    client_entry_t *result;
+    if (threading_ctx.mode == THREAD_MODE_SINGLE) {
+        HASH_FIND(hh, conn_table, addr, sizeof(*addr), result);
+        return result;
+    }
+    if (threading_ctx.mode == THREAD_MODE_DUAL) {
+        pthread_mutex_lock(&conn_table_mutex);
+        HASH_FIND(hh, conn_table, addr, sizeof(*addr), result);
+        pthread_mutex_unlock(&conn_table_mutex);
+        return result;
+    }
+    pthread_rwlock_rdlock(&conn_table_rwlock);
+    HASH_FIND(hh, conn_table, addr, sizeof(*addr), result);
+    pthread_rwlock_unlock(&conn_table_rwlock);
+    return result;
+}
+
+void add_client_safe(client_entry_t *entry) {
+    if (threading_ctx.mode == THREAD_MODE_SINGLE) {
+        HASH_ADD(hh, conn_table, client_addr, sizeof(entry->client_addr), entry);
+        return;
+    }
+    if (threading_ctx.mode == THREAD_MODE_DUAL) {
+        pthread_mutex_lock(&conn_table_mutex);
+        HASH_ADD(hh, conn_table, client_addr, sizeof(entry->client_addr), entry);
+        pthread_mutex_unlock(&conn_table_mutex);
+        return;
+    }
+    pthread_rwlock_wrlock(&conn_table_rwlock);
+    HASH_ADD(hh, conn_table, client_addr, sizeof(entry->client_addr), entry);
+    pthread_rwlock_unlock(&conn_table_rwlock);
+}
+
+void delete_client_safe(client_entry_t *entry) {
+    if (threading_ctx.mode == THREAD_MODE_SINGLE) {
+        HASH_DEL(conn_table, entry);
+        return;
+    }
+    if (threading_ctx.mode == THREAD_MODE_DUAL) {
+        pthread_mutex_lock(&conn_table_mutex);
+        HASH_DEL(conn_table, entry);
+        pthread_mutex_unlock(&conn_table_mutex);
+        return;
+    }
+    pthread_rwlock_wrlock(&conn_table_rwlock);
+    HASH_DEL(conn_table, entry);
+    pthread_rwlock_unlock(&conn_table_rwlock);
+}
 
 /**
  * @brief Handles incoming signals for the application.
@@ -37,6 +94,8 @@ static client_entry_t *conn_table = NULL;
 static void signal_handler(int signal) {
     client_entry_t *current_entry, *tmp;
 
+    threading_shutdown(&threading_ctx);
+
     // Close all connections and clean up
     if (listen_sock) {
         close(listen_sock);
@@ -45,7 +104,7 @@ static void signal_handler(int signal) {
         if (current_entry->server_sock) {
             close(current_entry->server_sock);
         }
-        HASH_DEL(conn_table, current_entry);
+        delete_client_safe(current_entry);
         free(current_entry);
     }
 #ifdef USE_EPOLL
@@ -66,7 +125,7 @@ static void signal_handler(int signal) {
  * @param forward_addr Pointer to a struct sockaddr_in representing the address to which traffic should be forwarded.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
+client_entry_t * new_client_entry(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
     if (HASH_COUNT(conn_table) >= config->max_clients) {
         log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
@@ -128,7 +187,7 @@ static client_entry_t * new_client_entry(obfuscator_config_t *config, struct soc
     }
 #endif
 
-    HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
+    add_client_safe(client_entry);
 
     log(LL_DEBUG, "Added binding: %s:%d:%d", 
         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
@@ -156,8 +215,7 @@ static client_entry_t * new_client_entry_static(obfuscator_config_t *config, str
     }
 
     // Check if such client already exists
-    client_entry_t *existing_entry;
-    HASH_FIND(hh, conn_table, client_addr, sizeof(*client_addr), existing_entry);
+    client_entry_t *existing_entry = find_client_safe(client_addr);
     if (existing_entry) {
         log(LL_ERROR, "Binding with client %s:%d already exists", 
             inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
@@ -232,7 +290,7 @@ static client_entry_t * new_client_entry_static(obfuscator_config_t *config, str
 
     client_entry->is_static = 1;
 
-    HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
+    add_client_safe(client_entry);
 
     return client_entry;
 }
@@ -290,6 +348,11 @@ int main(int argc, char *argv[]) {
     print_version();
 
     if (parse_config(argc, argv, &config) != 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    if (threading_init(&threading_ctx, &config) != 0) {
+        log(LL_ERROR, "Failed to initialize threading");
         exit(EXIT_FAILURE);
     }
 
@@ -442,6 +505,11 @@ int main(int argc, char *argv[]) {
     forward_addr.sin_port = htons(target_port);
     log(LL_INFO, "Target: %s:%d", target_host, target_port);
 
+    if (threading_start(&threading_ctx, listen_sock, &config, config.xor_key, key_length, &forward_addr) != 0) {
+        log(LL_ERROR, "Failed to start worker threads");
+        FAILURE();
+    }
+
     /* Add static bindings if provided */
     if (config.static_bindings[0]) {
         // Parse static bindings
@@ -561,9 +629,23 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
+                if (threading_ctx.mode != THREAD_MODE_SINGLE) {
+                    packet_job_t job;
+                    job.length = length;
+                    job.addr = sender_addr;
+                    job.addr_len = sender_addr_len;
+                    job.is_from_client = 1;
+                    job.client = NULL;
+                    memcpy(job.buffer, buffer, length);
+                    if (queue_push(&threading_ctx.queue, &job) < 0) {
+                        log(LL_WARN, "Packet queue is full, dropping packet from %s:%d",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                    }
+                    continue;
+                }
+
                 // Find the client entry if any
-                client_entry_t *client_entry;
-                HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
+                client_entry_t *client_entry = find_client_safe(&sender_addr);
 
                 uint8_t obfuscated = length >= 4 && is_obfuscated(buffer);
                 // Is it masked packet maybe?
@@ -729,6 +811,20 @@ int main(int argc, char *argv[]) {
                         target_host, target_port, length, BUFFER_SIZE);
                     continue;
                 }
+
+                if (threading_ctx.mode != THREAD_MODE_SINGLE) {
+                    packet_job_t job;
+                    job.length = length;
+                    job.addr_len = 0;
+                    job.is_from_client = 0;
+                    job.client = client_entry;
+                    memcpy(job.buffer, buffer, length);
+                    if (queue_push(&threading_ctx.queue, &job) < 0) {
+                        log(LL_WARN, "Packet queue is full, dropping packet from server");
+                    }
+                    continue;
+                }
+
                 uint8_t obfuscated = length >= 4 && is_obfuscated(buffer);
                 if (obfuscated) {
                     // Is it masked packet maybe?
@@ -884,7 +980,7 @@ int main(int argc, char *argv[]) {
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
 #endif
                     close(current_entry->server_sock);
-                    HASH_DEL(conn_table, current_entry);
+                    delete_client_safe(current_entry);
                     free(current_entry);
                 }
 
