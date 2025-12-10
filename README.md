@@ -4,7 +4,7 @@
 
 ## Описание
 
-**Phobos** автоматизирует настройку обфусцированного WireGuard соединения между VPS сервером и клиентскими роутерами (Keenetic, OpenWrt).
+**Phobos** автоматизирует настройку обфусцированного WireGuard соединения между VPS сервером и клиентами: роутерами (Keenetic, OpenWrt) и Linux компьютерами (Ubuntu/Debian).
 
 ## Быстрый старт
 
@@ -31,9 +31,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/Phobos/main
   - Вывод готовой HTTP-ссылки для установки на роутере
 </details>
 
-### 2. Установка на роутер
+### 2. Установка на клиенте
 
-#### Keenetic (Entware)
+#### Keenetic/Netcraze (Entware)
 
 Отправьте ссылку клиенту, он выполняет ее на роутере в терминале Entware, пример:
 
@@ -80,6 +80,37 @@ wget -O - http://<server_ip>:8080/init/<token>.sh | sh
   - Развернет скрипты health-check и uninstall
 </details>
 
+#### Linux (Ubuntu/Debian)
+
+Отправьте ссылку клиенту, он выполняет ее на Linux компьютере через SSH или терминал, пример:
+
+```bash
+wget -O - http://<server_ip>:8080/init/<token>.sh | sudo sh
+```
+
+<details>
+  <summary>Подробней</summary>
+
+  Скрипт автоматически:
+  - Установит WireGuard, resolvconf и net-tools через apt-get
+  - Скачает установочный пакет
+  - Определит архитектуру системы
+  - Установит правильный бинарник wg-obfuscator
+  - Настроит автозапуск obfuscator через systemd
+  - Настроит WireGuard через systemd с фиксированным интерфейсом "phobos"
+  - Настроит VPN как запасной интерфейс (не перехватывает системный трафик)
+  - Создаст зависимость WireGuard от obfuscator
+  - Активирует подключение
+  - Проверит создание интерфейса и туннеля
+  - Развернет скрипты health-check и uninstall
+
+  **Особенности Linux клиента:**
+  - VPN настроен как запасной интерфейс (`Table = off`)
+  - Системный трафик не перехватывается автоматически
+  - Для направления трафика через VPN используйте команды из документации
+  - Интерфейс называется "phobos" (аналогично OpenWrt "phobos_wg")
+</details>
+
 ## Интерактивное меню управления
 
 Система включает интерактивное меню управления.
@@ -112,11 +143,11 @@ sudo /opt/Phobos/repo/server/scripts/vps-uninstall.sh
 sudo /opt/Phobos/repo/server/scripts/vps-uninstall.sh --keep-data
 ```
 
-### Удаление с роутера
+### Удаление с клиента
 
-#### Keenetic
+#### Keenetic/Netcraze
 
-Для полного удаления Phobos с роутера Keenetic:
+Для полного удаления Phobos с роутера Keenetic/Netcraze:
 
 ```bash
 /opt/etc/Phobos/phobos-uninstall.sh
@@ -150,6 +181,25 @@ sudo /opt/Phobos/repo/server/scripts/vps-uninstall.sh --keep-data
   - Удалит бинарники и конфигурационные файлы
   - Удалит init-скрипт
   - Сохранит конфигурацию роутера
+</details>
+
+#### Linux (Ubuntu/Debian)
+
+Для полного удаления Phobos с Linux компьютера:
+
+```bash
+sudo /opt/Phobos/phobos-uninstall.sh
+```
+
+<details>
+  <summary>Подробней</summary>
+
+  Скрипт автоматически:
+  - Остановит phobos-obfuscator и wg-quick@phobos
+  - Удалит WireGuard интерфейс "phobos" и systemd override конфигурацию
+  - Удалит systemd сервисы (phobos-obfuscator.service)
+  - Удалит бинарники (/usr/local/bin/wg-obfuscator)
+  - Удалит конфигурационные файлы (/opt/Phobos, /etc/wireguard/phobos.conf)
 </details>
 
 ## Совместимость и рекомендации по установке
